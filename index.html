@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Helicity</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-deep: #05080f;
+      --storm-blue: #0a1a2f;
+      --accent: #00e5ff;
+      --accent-dim: #00a8b8;
+      --danger: #ff3d5a;
+      --danger-glow: #ff1744;
+      --text: #e8f4ff;
+      --muted: #8ba3b8;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-deep);
+      font-family: 'Rajdhani', sans-serif;
+      color: var(--text);
+    }
+
+    /* Animated storm sky */
+    .sky {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 120% 80% at 50% 120%, #1a0a0a 0%, transparent 50%),
+        radial-gradient(ellipse 80% 60% at 20% 10%, #0d1f3c 0%, transparent 45%),
+        radial-gradient(ellipse 70% 50% at 80% 15%, #0a1528 0%, transparent 40%),
+        linear-gradient(180deg, #02050a 0%, #0a1220 40%, #0d1525 70%, #05080f 100%);
+      z-index: 0;
+    }
+
+    /* Lightning flashes */
+    .lightning {
+      position: fixed;
+      inset: 0;
+      background: rgba(180, 220, 255, 0.15);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1;
+      mix-blend-mode: screen;
+    }
+
+    /* Rain / particle canvas */
+    #particles {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Vignette + grain */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.75) 100%);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .grain {
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+      opacity: 0.4;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    /* Main content */
+    .menu {
+      position: relative;
+      z-index: 10;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .logo-wrap {
+      margin-bottom: 3.5rem;
+      position: relative;
+    }
+
+    .logo {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: clamp(2.8rem, 9vw, 5.5rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #ffffff 0%, #a8e6ff 40%, #00e5ff 70%, #0088aa 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.45))
+              drop-shadow(0 0 40px rgba(0, 150, 200, 0.25));
+      position: relative;
+      line-height: 1.05;
+    }
+
+    .logo::after {
+      content: 'WEB HELICITY';
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, transparent 40%, rgba(0, 229, 255, 0.35) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: glitch 4s infinite;
+      pointer-events: none;
+    }
+
+    @keyframes glitch {
+      0%, 90%, 100% { transform: translate(0); opacity: 0; }
+      92% { transform: translate(-3px, 1px); opacity: 0.7; }
+      94% { transform: translate(3px, -1px); opacity: 0.5; }
+      96% { transform: translate(-2px, 0); opacity: 0.6; }
+    }
+
+    .tagline {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 0.6rem;
+      opacity: 0.85;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      width: min(340px, 85vw);
+    }
+
+    .btn {
+      position: relative;
+      display: block;
+      padding: 1.15rem 2rem;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: var(--text);
+      border: 1px solid transparent;
+      background: linear-gradient(135deg, rgba(10, 25, 45, 0.85), rgba(5, 15, 30, 0.9));
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+      transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, transparent 30%, rgba(0, 229, 255, 0.08) 50%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .btn::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 3px;
+      height: 100%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      transform: scaleY(0);
+      transform-origin: center;
+      transition: transform 0.3s ease;
+    }
+
+    .btn:hover {
+      border-color: rgba(0, 229, 255, 0.45);
+      color: #fff;
+      box-shadow:
+        0 0 25px rgba(0, 229, 255, 0.25),
+        inset 0 0 30px rgba(0, 229, 255, 0.05);
+      transform: translateY(-2px);
+    }
+
+    .btn:hover::before {
+      opacity: 1;
+    }
+
+    .btn:hover::after {
+      transform: scaleY(1);
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, rgba(0, 40, 60, 0.9), rgba(0, 20, 40, 0.95));
+      border-color: rgba(0, 229, 255, 0.35);
+    }
+
+    .btn.primary:hover {
+      border-color: var(--accent);
+      box-shadow:
+        0 0 30px rgba(0, 229, 255, 0.35),
+        0 0 60px rgba(0, 229, 255, 0.15),
+        inset 0 0 40px rgba(0, 229, 255, 0.08);
+    }
+
+    .btn.sandbox {
+      border-color: rgba(255, 61, 90, 0.25);
+    }
+
+    .btn.sandbox::after {
+      background: var(--danger);
+      box-shadow: 0 0 12px var(--danger);
+    }
+
+    .btn.sandbox:hover {
+      border-color: rgba(255, 61, 90, 0.55);
+      box-shadow:
+        0 0 25px rgba(255, 61, 90, 0.25),
+        inset 0 0 30px rgba(255, 61, 90, 0.05);
+    }
+
+    .btn span {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .btn .icon {
+      font-size: 1.25rem;
+      line-height: 1;
+      opacity: 0.9;
+    }
+
+    /* Footer / volume hint */
+    .footer {
+      position: absolute;
+      bottom: 1.75rem;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      opacity: 0.55;
+      z-index: 10;
+    }
+
+    /* Audio control */
+    .audio-toggle {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      z-index: 20;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      background: rgba(5, 15, 30, 0.7);
+      color: var(--accent);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(6px);
+    }
+
+    .audio-toggle:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+      background: rgba(0, 30, 50, 0.85);
+    }
+
+    .audio-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    .audio-toggle.muted {
+      color: var(--muted);
+      border-color: rgba(139, 163, 184, 0.3);
+    }
+
+    /* Entrance animation */
+    .menu > * {
+      animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .logo-wrap { animation-delay: 0.15s; }
+    .buttons { animation-delay: 0.4s; }
+    .footer { animation-delay: 0.7s; }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(28px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Mobile tweaks */
+    @media (max-width: 480px) {
+      .logo {
+        letter-spacing: 0.04em;
+      }
+      .tagline {
+        letter-spacing: 0.2em;
+      }
+      .btn {
+        font-size: 0.95rem;
+        padding: 1rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky"></div>
+  <div class="lightning" id="lightning"></div>
+  <canvas id="particles"></canvas>
+  <div class="overlay"></div>
+  <div class="grain"></div>
+
+  <button class="audio-toggle" id="audioToggle" title="Toggle music" aria-label="Toggle background music">
+    <svg id="iconSound" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    <svg id="iconMute" viewBox="0 0 24 24" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+  </button>
+
+  <div class="menu">
+    <div class="logo-wrap">
+      <h1 class="logo">Web Helicity</h1>
+      <p class="tagline">Storm Chasing Simulation</p>
+    </div>
+
+    <div class="buttons">
+      <a href="/game/chase.html" class="btn primary">
+        <span>
+          <span class="icon">🌪</span>
+          Tornado Chasing
+        </span>
+      </a>
+      <a href="/game/sandbox.html" class="btn sandbox">
+        <span>
+          <span class="icon">⚡</span>
+          Sandbox
+        </span>
+      </a>
+    </div>
+
+    <p class="footer">CLICK TO BEGIN • STAY ALERT</p>
+  </div>
+
+  <audio id="bgMusic" loop preload="auto">
+    <source src="/game/sounds/menu.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    // ===== Background Music =====
+    const audio = document.getElementById('bgMusic');
+    const toggleBtn = document.getElementById('audioToggle');
+    const iconSound = document.getElementById('iconSound');
+    const iconMute = document.getElementById('iconMute');
+    let musicStarted = false;
+
+    function updateAudioIcon(playing) {
+      iconSound.style.display = playing ? 'block' : 'none';
+      iconMute.style.display = playing ? 'none' : 'block';
+      toggleBtn.classList.toggle('muted', !playing);
+    }
+
+    function tryPlayMusic() {
+      if (musicStarted) return;
+      audio.volume = 0.45;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            musicStarted = true;
+            updateAudioIcon(true);
+          })
+          .catch(() => {
+            // Autoplay blocked – wait for user interaction
+            updateAudioIcon(false);
+          });
+      }
+    }
+
+    // Attempt autoplay, fall back to first interaction
+    document.addEventListener('click', tryPlayMusic, { once: true });
+    document.addEventListener('keydown', tryPlayMusic, { once: true });
+    tryPlayMusic();
+
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (audio.paused) {
+        audio.play().then(() => {
+          musicStarted = true;
+          updateAudioIcon(true);
+        });
+      } else {
+        audio.pause();
+        updateAudioIcon(false);
+      }
+    });
+
+    // ===== Lightning =====
+    const lightningEl = document.getElementById('lightning');
+    function flashLightning() {
+      lightningEl.style.opacity = '1';
+      setTimeout(() => {
+        lightningEl.style.opacity = '0.4';
+        setTimeout(() => {
+          lightningEl.style.opacity = '0';
+        }, 40);
+      }, 60);
+      // occasional double flash
+      if (Math.random() > 0.6) {
+        setTimeout(() => {
+          lightningEl.style.opacity = '0.7';
+          setTimeout(() => lightningEl.style.opacity = '0', 50);
+        }, 180);
+      }
+    }
+
+    function scheduleLightning() {
+      const delay = 4000 + Math.random() * 9000;
+      setTimeout(() => {
+        flashLightning();
+        scheduleLightning();
+      }, delay);
+    }
+    scheduleLightning();
+
+    // ===== Particles (rain + floating dust) =====
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    let w, h;
+    const drops = [];
+    const dust = [];
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    for (let i = 0; i < 140; i++) {
+      drops.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        len: 12 + Math.random() * 18,
+        speed: 8 + Math.random() * 12,
+        opacity: 0.15 + Math.random() * 0.25
+      });
+    }
+
+    for (let i = 0; i < 40; i++) {
+      dust.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 0.8 + Math.random() * 1.8,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: -0.15 - Math.random() * 0.35,
+        opacity: 0.08 + Math.random() * 0.15
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+
+      // Rain
+      ctx.strokeStyle = 'rgba(160, 200, 255, 0.35)';
+      ctx.lineWidth = 1.2;
+      for (const d of drops) {
+        ctx.globalAlpha = d.opacity;
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y);
+        ctx.lineTo(d.x - 1.5, d.y + d.len);
+        ctx.stroke();
+        d.y += d.speed;
+        d.x -= 0.8;
+        if (d.y > h) {
+          d.y = -d.len;
+          d.x = Math.random() * w;
+        }
+        if (d.x < 0) d.x = w;
+      }
+
+      // Floating dust / embers
+      for (const p of dust) {
+        ctx.globalAlpha = p.opacity;
+        ctx.fillStyle = 'rgba(180, 220, 255, 0.9)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < -10) {
+          p.y = h + 10;
+          p.x = Math.random() * w;
+        }
+        if (p.x < 0) p.x = w;
+        if (p.x > w) p.x = 0;
+      }
+
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(draw);
+    }
+    draw();
+  </script>
+</body>
+</html>
