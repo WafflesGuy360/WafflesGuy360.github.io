@@ -126,19 +126,35 @@ PR=[0x5b4a43,0x3b3f44,0x6e3b2e,0x4a5a4f,0x2f3a52,0x7a6a58,0x8a4b3a,0x23262b],PT=
 PD=[0x7a2d24,0x2d4a6e,0x2f5a3a,0x3a2a1e,0xb8862e,0x8a1f1f],PB=[0x7a3b2e,0x8a5a44,0x6e6a66,0x93513c],GL=[0x2a3f55,0x3a5570,0x1f2a38,0x4a6a80],
 pk=a=>a[Math.floor(Math.random()*a.length)];
 const DEBMAX=6500;
-function frags(o,n){for(let k=0;k<n&&NP<MAXP;k++){const i=NP++,col=o.col.clone().offsetHSL(0,0,rnd(-.08,.08)),sz=new V3(rnd(.15,.9),rnd(.04,.28),rnd(.15,.9));
- const f={p:o.p.clone().add(new V3(rnd(-1,1),rnd(-.5,.8),rnd(-1,1))),q:new Q().setFromEuler(new THREE.Euler(rnd(0,6),rnd(0,6),rnd(0,6))),s:sz,v:o.v.clone().add(new V3(rnd(-7,7),rnd(0,9),rnd(-7,7))),
-  w:new V3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(rnd(2,10)),th:1,on:1,i,col,c:1.1/(Math.min(sz.x,sz.y,sz.z)*2.5+.5)*rnd(.8,1.2),sp:3,dmg:0,hv:rnd(.3,.9),cw:null,ft:0};
+// ---- debris weight ----------------------------------------------------------------------------------------------
+// A torn-off piece no longer snaps to the wind speed. It feels quadratic drag toward the local wind, a = bc*|rel|*rel, where
+// bc = 0.5*rho_air*Cd / (mass per area) [1/m]. Mass per area = DENS * thickness, so thick pieces (walls, roof sections, chimney,
+// beams) lag behind the wind, get thrown a little and drop, while only thin light pieces (boards, glass, splinters) are carried up.
+// DENS: bigger = heavier (180 = a heavy, hard-to-lift house part; the old behaviour was effectively 0).  DGH: extra gravity for heavy pieces inside the wind.  AIRT: seconds airborne before despawn.
+const DENS=180,DGH=3,AIRT=30;
+const dragOf=s=>.72/(DENS*Math.max(Math.min(s.x,s.y,s.z),.03)*rnd(.7,1.5)),lightOf=bc=>clamp((bc-.004)/.03,0,1);
+function fly(o,dt,v){
+ if(o.ft>0)o.ft-=dt;
+ const rx=wv.x-o.v.x,ry=wv.y-o.v.y,rz=wv.z-o.v.z,inW=v>.5,hv=o.hv===undefined?.3:o.hv,
+  c=inW&&!(o.ft>0)?1-Math.exp(-(o.bc||.02)*Math.hypot(rx,ry,rz)*dt):0;
+ o.v.x+=rx*c;o.v.z+=rz*c;o.v.y+=ry*c-(inW?9.8+(1-hv)*DGH:DG)*dt;
+ if(inW&&hv>.12){const ex=o.p.x-T.x,ez=o.p.z-T.z,er=Math.max(Math.hypot(ex,ez),T.R0*.5),hs=Math.hypot(wv.x,wv.z),ac=Math.min(100,hs*hs/er*.3*hv);
+  o.v.x+=ex/er*ac*dt;o.v.z+=ez/er*ac*dt;
+  if(!(o.ft>0)&&Math.random()<dt*.3*hv*hv){o.ft=rnd(.7,1.6);const sp=hs*.6;o.v.x+=ex/er*sp+(-ez/er)*sp*.5;o.v.z+=ez/er*sp+(ex/er)*sp*.5;o.v.y+=hs*.1}}
+ o.p.addScaledVector(o.v,dt)}
+function frags(o,n){for(let k=0;k<n&&NP<MAXP;k++){const i=NP++,col=o.col.clone().offsetHSL(0,0,rnd(-.08,.08)),sz=new V3(rnd(.15,.9),rnd(.04,.28),rnd(.15,.9)),bc=dragOf(sz);
+ const f={p:o.p.clone().add(new V3(rnd(-1,1),rnd(-.5,.8),rnd(-1,1))),q:new Q().setFromEuler(new THREE.Euler(rnd(0,6),rnd(0,6),rnd(0,6))),s:sz,v:o.v.clone().add(new V3(rnd(-5,5),rnd(0,4),rnd(-5,5))),
+  w:new V3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(rnd(2,10)),th:1,on:1,i,col,c:1.1/(Math.min(sz.x,sz.y,sz.z)*2.5+.5)*rnd(.8,1.2),sp:3,dmg:0,bc,hv:lightOf(bc),at:0,cw:null,ft:0};
  setC(i,col);M.compose(f.p,f.q,f.s);setM(i,M);A.push(f)}}
-function mkB(x,z,yaw){
+function mkB(x,z,yaw,qf){
  const y0=H(x,z),c=Math.cos(yaw),s=Math.sin(yaw),qy=new Q().setFromAxisAngle(UP,yaw),pcs=[],XA=new V3(1,0,0),ZA=new V3(0,0,1);
  const add=(lx,ly,lz,sx,sy,sz,hex,th,tilt,tz)=>{if(NP>=MAXP)return;const q=qy.clone();if(tilt)q.multiply(new Q().setFromAxisAngle(XA,tilt));if(tz)q.multiply(new Q().setFromAxisAngle(ZA,tz));
-  const col=new THREE.Color(hex).offsetHSL(0,0,rnd(-.04,.04)),i=NP++,o={p:new V3(x+lx*c+lz*s,y0+ly,z-lx*s+lz*c),q,s:new V3(sx,sy,sz),v:new V3(),w:new V3(),th:th*rnd(.88,1.15),on:0,i,col,c:1.1/(Math.min(sx,sy,sz)*2.5+.5)*rnd(.8,1.2),sp:0,dmg:0,cw:null,ft:0};
+  const col=new THREE.Color(hex).offsetHSL(0,0,rnd(-.04,.04)),i=NP++,o={p:new V3(x+lx*c+lz*s,y0+ly,z-lx*s+lz*c),q,s:new V3(sx,sy,sz),v:new V3(),w:new V3(),th:th*rnd(.88,1.15)*(qf||1),on:0,i,col,c:1.1/(Math.min(sx,sy,sz)*2.5+.5)*rnd(.8,1.2),sp:0,dmg:0,cw:null,ft:0};
   o.hp=o.p.clone();o.hq=q.clone();o.hs=o.s.clone();setC(i,col);M.compose(o.p,o.q,o.s);setM(i,M);pcs.push(o)};
  const P=(f,ox,oy,oz)=>{const nx=f==2?1:f==3?-1:0,nz=f==0?1:f==1?-1:0;
   return(u,v,n,su,sv,sn,hex,th,tilt)=>nz?add(ox+u,oy+v,oz+nz*n,su,sv,sn,hex,th,tilt):add(ox+nx*n,oy+v,oz+u,sn,sv,su,hex,th,tilt)};
- const walls=(cx,cz,w,d,h,hex,th,skip)=>{const rows=Math.max(2,Math.round(h/1.4)),rw=h/rows,nx=Math.max(2,Math.round(w/2)),nz=Math.max(2,Math.round(d/2));
-  for(let r=0;r<rows;r++){const ly=.5+(r+.5)*rw,t2=th*(r==rows-1&&rows>1?.92:1);
+ const walls=(cx,cz,w,d,h,hex,th,skip,vg)=>{const rows=Math.max(2,Math.round(h/1.4)),rw=h/rows,nx=Math.max(2,Math.round(w/2)),nz=Math.max(2,Math.round(d/2));
+  for(let r=0;r<rows;r++){const ly=.5+(r+.5)*rw,t2=th*(r==rows-1&&rows>1?.92:1)*(1-(vg||0)*r/Math.max(1,rows-1));
    for(let k=0;k<nx;k++){const lx=cx+(k+.5)/nx*w-w/2;for(const g of[-1,1])add(lx,ly,cz+g*d/2,w/nx,rw,.25,hex,t2)}
    for(let k=0;k<nz;k++){const lz=cz+(k+.5)/nz*d-d/2;for(const g of[-1,1])if(skip!==g)add(cx+g*w/2,ly,lz,.25,rw,d/nz,hex,t2)}}};
  const win=(f,ox,oy,oz,ww,hh,trim,shut)=>{const p=P(f,ox,oy,oz),gl=pk(GL);hh=hh||1.1;
@@ -151,12 +167,16 @@ function mkB(x,z,yaw){
   for(const g of[-1,1])for(let j=0;j<m;j++)add(g*(w/2),.5+h+(j+.5)*rh/m,0,.25,rh/m,Math.max(.4,Math.min(d,2*hd*(1-(j+1)/m))),wall,th*.85)};
  return{add,P,walls,win,gable,done(t){HS.push({x,z,t,pcs})}}}
 
-function buildHouse(x,z,yaw){const B=mkB(x,z,yaw),add=B.add,P=B.P;
+// House strengths are the local wind speed (m/s) at which a piece fails, tuned to the EF damage descriptions for houses
+// (the wind field gives ~0.82x the dial speed at ground level, so dial mph ~= th / 0.37):
+//   chimney ~EF1 · roof/gable ~EF1-EF2 · porch/garage door ~EF1 · upper walls ~EF2 · ground-floor walls ~EF3 · EF4+ levels it, slab stays
+// Each house also gets its own construction quality (about +/-14%), so neighbours don't all fail identically.
+function buildHouse(x,z,yaw){const B=mkB(x,z,yaw,1+(rnd(-1,1)+rnd(-1,1))*.07),add=B.add,P=B.P;
  const fl=Math.random()<.4?2:1,fh=2.8,h=fl*fh,flat=Math.random()<.13,w=rnd(9,14),d=rnd(7,10),wall=pk(PW),roof=pk(PR),trim=pk(PT),dc=pk(PD),brick=pk(PB),shut=Math.random()<.5?pk(PD):null,
   rh=flat?.3:rnd(1.6,3.4),garage=Math.random()<.5,gs=Math.random()<.5?1:-1,porch=Math.random()<.75,chim=!flat&&Math.random()<.7,fence=Math.random()<.35,
-  doorX=pk([-w*.22,0,w*.2]),ww=flat?2.2:1.5,th=62,RT=38;
+  doorX=pk([-w*.22,0,w*.2]),ww=flat?2.2:1.5,th=50,RT=35;
  add(0,0,0,w+.5,1,d+.5,0x6d6a66,1e9);
- B.walls(0,0,w,d,h,wall,th);
+ B.walls(0,0,w,d,h,wall,th,0,.06);
  for(const sx of[-1,1])for(const sz of[-1,1])add(sx*(w/2+.1),.5+h/2,sz*(d/2+.1),.3,h,.3,trim,th*1.15);
  if(fl==2)for(const g of[-1,1]){add(0,.5+fh,g*(d/2+.17),w+.3,.14,.12,trim,th*.9);add(g*(w/2+.17),.5+fh,0,.12,.14,d+.3,trim,th*.9)}
  const nw=Math.max(2,Math.floor((w-2)/3.2)),xs=[];for(let k=0;k<nw;k++)xs.push(-w/2+1.9+(w-3.8)*k/(nw-1));
@@ -167,15 +187,15 @@ function buildHouse(x,z,yaw){const B=mkB(x,z,yaw),add=B.add,P=B.P;
  {const p=P(0,doorX,.5+1.15,d/2+.125);p(0,0,.06,1.5,2.4,.1,trim,40);p(0,-.05,.11,1.15,2.25,.1,dc,38);p(.38,-.05,.18,.1,.1,.08,0xd4af37,38);p(0,.55,.16,.7,.35,.04,pk(GL),22)}
  if(flat){add(0,.5+h+.15,0,w+.8,.3,d+.8,roof,RT*1.1);for(const g of[-1,1]){add(0,.5+h+.5,g*(d/2+.35),w+.8,.4,.15,trim,RT*.9);add(g*(w/2+.35),.5+h+.5,0,.15,.4,d+.8,trim,RT*.9)}add(w*.2,.5+h+.8,-d*.15,1.1,.7,1.1,0xb9bec2,26)}
  else{B.gable(w,d,h,rh,roof,trim,wall,th,.35,RT);if(rh>2.3)for(const f of[2,3])B.win(f,f==2?w/2+.125:-w/2-.125,.5+h+rh*.28,0,.8,.7,trim,null)}
- if(chim){const cx=(Math.random()<.5?-1:1)*w*.28;add(cx,.5+(h+rh+1.1)/2,-d*.12,1,h+rh+1.1,1,brick,58);add(cx,.5+h+rh+1.15,-d*.12,1.35,.15,1.35,0x555555,44)}
+ if(chim){const cx=(Math.random()<.5?-1:1)*w*.28;add(cx,.5+(h+rh+1.1)/2,-d*.12,1,h+rh+1.1,1,brick,36);add(cx,.5+h+rh+1.15,-d*.12,1.35,.15,1.35,0x555555,30)}
  if(porch){const pw=rnd(3.6,5);add(doorX,.58,d/2+1.25,pw,.2,2.5,0x8a7a66,48);
-  for(const g of[-1,1])add(doorX+g*(pw/2-.15),.5+1.4,d/2+2.3,.18,2.8,.18,trim,42);
+  for(const g of[-1,1])add(doorX+g*(pw/2-.15),.5+1.4,d/2+2.3,.18,2.8,.18,trim,34);
   add(doorX,.5+2.8,d/2+1.3,pw+.5,.15,2.9,roof,30,.12);
   add(doorX,.38,d/2+2.8,pw*.5,.2,.6,0x8a7a66,48);
   for(const g of[-1,1])add(doorX+g*(pw/2-.3),.5+.85,d/2+1.3,.08,.08,2.3,trim,28);
   add(doorX,.12,d/2+6,1.3,.12,6.4,0x9a968c,1e9)}
  if(garage){const gw=rnd(5,6.5),gd=d-.8,gh=2.6,gx=gs*(w/2+gw/2),gz=-.4;
-  add(gx,0,gz,gw+.5,1,gd+.5,0x6d6a66,1e9);B.walls(gx,gz,gw,gd,gh,wall,th*.92,-gs);
+  add(gx,0,gz,gw+.5,1,gd+.5,0x6d6a66,1e9);B.walls(gx,gz,gw,gd,gh,wall,th*.88,-gs,.06);
   add(gx,.5+gh+.15,gz,gw+.7,.2,gd+.8,roof,RT*.9,.1);
   const pg=P(0,gx,.5+1.15,gz+gd/2+.125);pg(0,0,.06,gw*.82,2.3,.08,0xeeeeee,34);for(const v of[-.75,-.25,.25,.75])pg(0,v,.11,gw*.82,.05,.04,0xb0b0b0,34);
   add(gx,.12,gz+gd/2+4.8,gw*.8,.12,9.6,0x77746e,1e9);
@@ -622,17 +642,16 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-last)/1000
  const gust=.95+.1*vn(now*.002,1),rng=(T.R0*1.5+90+extOf())**2;let torn=0,tx0=0,tz0=0;
  for(const h of HS){const dx=h.x-T.x,dz=h.z-T.z;if(dx*dx+dz*dz>rng)continue;
   for(const o of h.pcs){if(o.on||((o.i+fr)&1))continue;const ratio=wind(o.p.x,o.p.z,o.p.y-gy)*gust/o.th;
-   if(ratio>1.25||(ratio>.85&&(o.dmg+=(ratio-.85)*dt*2.5)>1)){o.on=1;o.hv=rnd(.04,.5);A.push(o);torn++;tx0=o.p.x;tz0=o.p.z;o.w.set(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(rnd(1,6));o.v.copy(wv).multiplyScalar(.8);o.v.y+=rnd(2,8);if(A.length<DEBMAX)frags(o,o.s.x*o.s.y*o.s.z>.6?3:2)}}}
+   if(ratio>1.25||(ratio>.85&&(o.dmg+=(ratio-.85)*dt*2.5)>1)){o.on=1;o.at=0;o.bc=dragOf(o.s);o.hv=lightOf(o.bc);A.push(o);torn++;tx0=o.p.x;tz0=o.p.z;o.w.set(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(rnd(1,6)*(.3+.7*o.hv));o.v.copy(wv).multiplyScalar(.08+.5*o.hv);o.v.y+=rnd(0,1+6*o.hv);if(A.length<DEBMAX&&Math.random()<.6)frags(o,o.s.x*o.s.y*o.s.z>.6?2:1)}}}
  if(torn)sfxAt('breakup',tx0,tz0,Math.min(1,.4+torn*.1),180,6000);
  let hits=0,hx=0,hz=0;
  for(let k=A.length-1;k>=0;k--){const o=A[k];let v;if(((o.i+fr)%3)&&o.cw){v=o.cv;wv.copy(o.cw)}else{v=wind(o.p.x,o.p.z,o.p.y)*gust;(o.cw||(o.cw=new V3())).copy(wv);o.cv=v}
-  if(o.ft>0)o.ft-=dt;const rx=wv.x-o.v.x,ry=wv.y-o.v.y,rz=wv.z-o.v.z,rm=Math.hypot(rx,ry,rz),inW=v>.5,hv=o.hv===undefined?.3:o.hv,c=inW?(o.ft>0?0:.9):0;
-  o.v.x+=rx*c;o.v.z+=rz*c;o.v.y+=ry*c-(inW?9.8+(1-hv)*26:DG)*dt;
-  if(inW){const ex=o.p.x-T.x,ez=o.p.z-T.z,er=Math.max(Math.hypot(ex,ez),T.R0*.5),hs=Math.hypot(wv.x,wv.z),ac=Math.min(140,hs*hs/er*.9*(1.1-hv));o.v.x+=ex/er*ac*dt;o.v.z+=ez/er*ac*dt;
-   if(!(o.ft>0)&&Math.random()<dt*.5*(1-hv)){o.ft=rnd(.7,1.6);const sp=hs*.9;o.v.x+=ex/er*sp+(-ez/er)*sp*.5;o.v.z+=ez/er*sp+(ex/er)*sp*.5;o.v.y+=hs*.15}}o.p.addScaledVector(o.v,dt);
+  fly(o,dt,v);
   const g=H(o.p.x,o.p.z)+Math.min(o.s.x,o.s.y,o.s.z)*.5;
-  if(o.p.y<g){if(-o.v.y>14){hits++;hx=o.p.x;hz=o.p.z}o.p.y=g;if(-o.v.y>9&&o.sp<3){o.sp++;split(o)}o.v.y=0;o.v.x*=.55;o.v.z*=.55;o.w.multiplyScalar(.35)}
-  if(o.p.y<=g+.05){const fr2=Math.max(0,1-dt*2.5);o.v.x*=fr2;o.v.z*=fr2}
+  // anything that stays in the air for AIRT seconds (stuck up in the funnel) despawns; the clock restarts whenever it touches down
+  if(o.p.y>g+.3){if((o.at=(o.at||0)+dt)>AIRT){o.s.set(1e-4,1e-4,1e-4);M.compose(o.p,o.q,o.s);setM(o.i,M);A.splice(k,1);continue}}else o.at=0;
+  if(o.p.y<g){if(-o.v.y>14){hits++;hx=o.p.x;hz=o.p.z}o.p.y=g;if(-o.v.y>9&&o.sp<3){o.sp++;split(o)}o.v.y=0;o.v.x*=.4+.3*(o.hv||0);o.v.z*=.4+.3*(o.hv||0);o.w.multiplyScalar(.35)}
+  if(o.p.y<=g+.05){const fr2=Math.max(0,1-dt*(2.5+7*(1-(o.hv||0))));o.v.x*=fr2;o.v.z*=fr2}
   o.w.multiplyScalar(1-dt*.15);const wl=o.w.length();if(wl>1e-3){tq.setFromAxisAngle(tv.copy(o.w).divideScalar(wl),wl*dt);o.q.premultiply(tq)}
   M.compose(o.p,o.q,o.s);setM(o.i,M);
   if(o.p.y<=g+.02&&o.v.lengthSq()<1&&v<18){A.splice(k,1)}}
